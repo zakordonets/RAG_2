@@ -70,20 +70,26 @@
      - m=${QDRANT_HNSW_M}, ef_construct=${QDRANT_HNSW_EF_CONSTRUCT}, ef_search=${QDRANT_HNSW_EF_SEARCH}, full_scan_threshold=${QDRANT_HNSW_FULL_SCAN_THRESHOLD}.
 
 8) Observability & Evaluation
-   - Логи пайплайна (запрос, сущности, переформулировка, кандидаты, веса, оценки).
-   - Метрики retrieval: Context Relevance, Context Coverage, Precision@K, Recall@K.
-   - Метрики generation: Answer Relevancy, Faithfulness, Completeness.
-   - Офлайн-оценка на golden set (когда появится) и онлайн-сигналы (user feedback, click-through на источники).
-   - Хранение метрик/логов: файлы/лог-агрегатор (без обязательного Prometheus на первом этапе).
+   - **Comprehensive Error Handling**: Try-catch блоки для каждого этапа pipeline с graceful degradation
+   - **Prometheus метрики**: Полный набор метрик для мониторинга производительности и ошибок
+   - **Circuit Breaker**: Защита от каскадных сбоев внешних сервисов (LLM, эмбеддинги, Qdrant)
+   - **Кэширование**: Redis + in-memory fallback для эмбеддингов и результатов поиска
+   - **Валидация и санитизация**: Marshmallow схемы и защита от XSS/инъекций
+   - Логи пайплайна (запрос, сущности, переформулировка, кандидаты, веса, оценки)
+   - Метрики retrieval: Context Relevance, Context Coverage, Precision@K, Recall@K
+   - Метрики generation: Answer Relevancy, Faithfulness, Completeness
+   - Офлайн-оценка на golden set (когда появится) и онлайн-сигналы (user feedback, click-through на источники)
+   - HTTP сервер метрик на порту 8000, admin endpoints для управления
 
 ### Логический поток запроса
-1) Channel Adapter принимает сообщение → Core API `/v1/chat/query`.
-2) Query Processing: извлечение сущностей и нормализация; при необходимости декомпозиция.
-3) Embedding: получение dense и sparse представлений запроса.
-4) Retrieval: параллельные dense и sparse запросы к Qdrant → RRF → metadata-boost → bge-reranker.
-5) Generation: выбор LLM по роутингу и fallback, формирование ответа на основе top-k контекста.
-6) Postprocess: формирование источников (список `url` + заголовки), сокращение/структурирование.
-7) Delivery: ответ через соответствующий Channel Adapter (Telegram).
+1) **Channel Adapter** принимает сообщение → **Core API** `/v1/chat/query` с валидацией и санитизацией
+2) **Query Processing**: извлечение сущностей и нормализация; при необходимости декомпозиция
+3) **Embedding**: получение dense и sparse представлений запроса (с кэшированием)
+4) **Retrieval**: параллельные dense и sparse запросы к Qdrant → RRF → metadata-boost → bge-reranker
+5) **Generation**: выбор LLM по роутингу и fallback, формирование ответа на основе top-k контекста
+6) **Postprocess**: формирование источников (список `url` + заголовки), сокращение/структурирование
+7) **Delivery**: ответ через соответствующий Channel Adapter (Telegram)
+8) **Мониторинг**: запись метрик, обработка ошибок, Circuit Breaker проверки
 
 ### Дизайн абстракций (упрощенные интерфейсы)
 ```python
@@ -126,33 +132,73 @@ client.search(collection_name,
 ```
 
 ### Конфигурация и окружение
-- ENV (пример):
-  - QDRANT_URL, QDRANT_API_KEY, QDRANT_HNSW_M, QDRANT_HNSW_EF_CONSTRUCT, QDRANT_HNSW_EF_SEARCH, QDRANT_HNSW_FULL_SCAN_THRESHOLD
-  - OLLAMA_URL, EMBEDDING_MODEL_TYPE=BGE-M3, EMBEDDING_MODEL_NAME=bge-m3:latest
-  - DEEPSEEK_API_URL, DEEPSEEK_API_KEY, DEEPSEEK_MODEL
-  - YANDEX_API_URL, YANDEX_CATALOG_ID, YANDEX_API_KEY, YANDEX_MODEL, YANDEX_MAX_TOKENS
+- **ENV переменные** (полный список в `env.example`):
+  - **Qdrant**: QDRANT_URL, QDRANT_API_KEY, QDRANT_HNSW_M, QDRANT_HNSW_EF_CONSTRUCT, QDRANT_HNSW_EF_SEARCH, QDRANT_HNSW_FULL_SCAN_THRESHOLD
+  - **Эмбеддинги**: OLLAMA_URL, EMBEDDING_MODEL_TYPE=BGE-M3, EMBEDDING_MODEL_NAME=bge-m3:latest, SPARSE_SERVICE_URL, USE_SPARSE
+  - **LLM провайдеры**: DEEPSEEK_API_URL, DEEPSEEK_API_KEY, DEEPSEEK_MODEL, YANDEX_API_URL, YANDEX_CATALOG_ID, YANDEX_API_KEY, YANDEX_MODEL, YANDEX_MAX_TOKENS, GPT5_API_URL, GPT5_API_KEY, GPT5_MODEL
+  - **Telegram**: TELEGRAM_BOT_TOKEN, TELEGRAM_POLL_INTERVAL
+  - **Кэширование**: REDIS_URL, CACHE_ENABLED
+  - **Краулинг**: CRAWL_START_URL, CRAWL_CONCURRENCY, CRAWL_TIMEOUT_S, CRAWL_MAX_PAGES, CRAWL_DELAY_MS, CRAWL_JITTER_MS, CRAWL_STRATEGY
+  - **Безопасность**: MAX_MESSAGE_LENGTH, ALLOWED_CHANNELS, RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW
 
 ### ADR (ключевые решения)
-1) Qdrant как единая база для dense+sparse → упрощение стека и гибридный поиск «из коробки».
-2) BGE-M3: dense → Ollama; sparse → локальный FlagEmbedding. Хранение обоих представлений в одной коллекции.
-3) RRF + bge-reranker-v2-m3 (CPU, 12 потоков): старт равные веса (0.5/0.5), затем A/B-тест (например 0.6/0.4).
-4) Инкрементальная индексация по hash/updated_at и дифф-стратегии; запуск вручную (cron позднее).
-5) Ограниченная глубина пошагового RAG (max_depth=3) для контроля стоимости и латентности.
+1) **Qdrant** как единая база для dense+sparse → упрощение стека и гибридный поиск «из коробки»
+2) **BGE-M3**: dense → SentenceTransformers (локально); sparse → локальный FlagEmbedding. Хранение обоих представлений в одной коллекции
+3) **RRF + bge-reranker-v2-m3** (CPU, 12 потоков): старт равные веса (0.5/0.5), затем A/B-тест (например 0.6/0.4)
+4) **Инкрементальная индексация** по hash/updated_at и дифф-стратегии; запуск вручную (cron позднее)
+5) **Ограниченная глубина** пошагового RAG (max_depth=3) для контроля стоимости и латентности
+6) **Comprehensive Error Handling**: Try-catch на каждом этапе с graceful degradation и fallback логикой
+7) **Circuit Breaker Pattern**: Защита от каскадных сбоев внешних сервисов с автоматическим восстановлением
+8) **Кэширование**: Redis + in-memory fallback для эмбеддингов и результатов поиска
+9) **Валидация и санитизация**: Marshmallow схемы и защита от XSS/инъекций
+10) **Prometheus метрики**: Полный мониторинг производительности, ошибок и состояния системы
 
 ### Масштабирование и производительность
-- Асинхронная индексация и парсинг (пулы воркеров).
-- Кэширование результатов эмбеддингов и retrieval (будущее).
-- Батчевое вычисление эмбеддингов.
-- Настройка HNSW параметров под объём (из ENV).
-- Горизонтальное масштабирование Core API за счёт stateless дизайна.
+- **Асинхронная индексация** и парсинг (пулы воркеров)
+- **Кэширование**: Redis + in-memory fallback для эмбеддингов и результатов поиска
+- **Батчевое вычисление** эмбеддингов
+- **Настройка HNSW** параметров под объём (из ENV)
+- **Горизонтальное масштабирование** Core API за счёт stateless дизайна
+- **Circuit Breaker** для защиты от перегрузки внешних сервисов
+- **Метрики производительности** для оптимизации и мониторинга
+- **Graceful degradation** при сбоях компонентов
 
 ### Безопасность и приватность
-- Ключи и конфиги в `.env` (добавлен в `.gitignore`), примеры — в `env.example` без секретов.
-- На старте без rate limiting и без капчи; требований к PII-логированию нет.
-- При расширении каналов — переоценка требований безопасности.
+- **Конфигурация**: Ключи и конфиги в `.env` (добавлен в `.gitignore`), примеры — в `env.example` без секретов
+- **Валидация входных данных**: Marshmallow схемы для всех API endpoints
+- **Санитизация**: HTML экранирование и защита от XSS/инъекций
+- **Ограничения**: Максимальная длина сообщений, разрешенные каналы
+- **Rate Limiting**: Базовая защита от злоупотреблений (в разработке)
+- **Логирование**: Детальное логирование для аудита и отладки
+- **Мониторинг**: Отслеживание подозрительной активности через метрики
+- При расширении каналов — переоценка требований безопасности
+
+### API Endpoints
+
+#### Основные endpoints
+- **`POST /v1/chat/query`** — универсальный интерфейс запроса с валидацией и санитизацией
+- **`POST /v1/admin/reindex`** — ручной запуск инкрементального обновления
+
+#### Мониторинг и администрирование
+- **`GET /v1/admin/health`** — проверка состояния системы с Circuit Breakers и кэшем
+- **`GET /v1/admin/metrics`** — метрики Prometheus в JSON формате
+- **`GET /v1/admin/metrics/raw`** — сырые метрики Prometheus для мониторинга
+- **`GET /v1/admin/circuit-breakers`** — состояние Circuit Breakers
+- **`POST /v1/admin/circuit-breakers/reset`** — сброс Circuit Breakers
+- **`GET /v1/admin/cache`** — статистика кэша
+- **`POST /v1/admin/metrics/reset`** — сброс метрик (только для тестирования)
+
+#### Метрики Prometheus
+- **`rag_queries_total`** — количество запросов по каналам и статусам
+- **`rag_query_duration_seconds`** — длительность этапов обработки
+- **`rag_embedding_duration_seconds`** — время создания эмбеддингов
+- **`rag_search_duration_seconds`** — время поиска
+- **`rag_llm_duration_seconds`** — время генерации LLM
+- **`rag_cache_hits_total`** — попадания в кэш
+- **`rag_errors_total`** — ошибки по типам и компонентам
 
 ### Будущие интерфейсы
-- Реализация дополнительных `ChannelAdapter`: Web-виджет и edna API Bot Connect (двусторонние вложения не требуются на старте).
-- Единый `/v1/chat/query` остаётся стабильным контрактом.
+- Реализация дополнительных `ChannelAdapter`: Web-виджет и edna API Bot Connect (двусторонние вложения не требуются на старте)
+- Единый `/v1/chat/query` остаётся стабильным контрактом
 
 
