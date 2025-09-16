@@ -19,5 +19,8 @@ fastapi==0.115.6
 uvicorn[standard]==0.30.6
 playwright==1.55.0
 sentence-transformers==3.0.1
+telegramify-markdown==0.1.0
+marshmallow==3.23.1
+redis==5.0.8
 
 

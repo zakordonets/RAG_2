@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Iterable
 import os
 import requests
+from loguru import logger
 from app.config import CONFIG
+from app.caching import cache_embedding, cache_manager
 from threading import Lock
 
 # На Windows отключаем symlink'и HuggingFace, чтобы избежать прав доступа
@@ -32,11 +34,18 @@ def _get_st_model():
     return _st_model
 
 
+@cache_embedding(ttl=3600)  # Кэшируем на 1 час
 def embed_dense(text: str) -> list[float]:
     """Возвращает dense-эмбеддинг через локальный SentenceTransformers (BAAI/bge-m3)."""
+    if not CONFIG.cache_enabled:
+        # Если кэширование отключено, выполняем напрямую
+        model = _get_st_model()
+        vec = model.encode(text, normalize_embeddings=True)
+        return vec.tolist()
+    
+    # Кэшированная версия
     model = _get_st_model()
     vec = model.encode(text, normalize_embeddings=True)
-    # tolist() на numpy.ndarray
     return vec.tolist()
 
 
@@ -49,18 +58,33 @@ def embed_dense_batch(texts: Iterable[str]) -> list[list[float]]:
     return [row.tolist() for row in mat]
 
 
+@cache_embedding(ttl=3600)  # Кэшируем на 1 час
 def embed_sparse(text: str) -> dict:
     """Возвращает sparse-представление текста (BGE-M3 sparse) через локальный сервис.
     Приводит ответ к формату Qdrant: {indices: [...], values: [...]}.
     """
     if not CONFIG.use_sparse:
         return {"indices": [], "values": []}
-    try:
-        resp = requests.post(f"{SPARSE_SERVICE_URL}/embed", json={"text": text}, timeout=60)
-        resp.raise_for_status()
-        data = resp.json()
-    except Exception:
-        return {"indices": [], "values": []}
+    
+    if not CONFIG.cache_enabled:
+        # Если кэширование отключено, выполняем напрямую
+        try:
+            resp = requests.post(f"{SPARSE_SERVICE_URL}/embed", json={"text": text}, timeout=60)
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            logger.warning(f"Sparse embedding service failed: {e}")
+            return {"indices": [], "values": []}
+    else:
+        # Кэшированная версия
+        try:
+            resp = requests.post(f"{SPARSE_SERVICE_URL}/embed", json={"text": text}, timeout=60)
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            logger.warning(f"Sparse embedding service failed: {e}")
+            return {"indices": [], "values": []}
+    
     # Ожидаемый формат для Qdrant SparseVector: {indices: [...], values: [...]}
     # Если сервис вернул словарь term->weight, конвертируем в списки
     if isinstance(data, dict) and ("indices" not in data or "values" not in data):
