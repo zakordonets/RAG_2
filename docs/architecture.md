@@ -200,5 +200,3 @@ client.search(collection_name,
 ### Будущие интерфейсы
 - Реализация дополнительных `ChannelAdapter`: Web-виджет и edna API Bot Connect (двусторонние вложения не требуются на старте)
 - Единый `/v1/chat/query` остаётся стабильным контрактом
-
-
