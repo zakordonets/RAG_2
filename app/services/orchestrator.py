@@ -34,25 +34,25 @@ class LLMError(RAGError):
 def handle_query(channel: str, chat_id: str, message: str) -> dict[str, Any]:
     """
     Обрабатывает пользовательский запрос с comprehensive error handling.
-    
+
     Args:
         channel: Канал связи (telegram, web, etc.)
         chat_id: ID чата
         message: Текст сообщения
-        
+
     Returns:
         Словарь с ответом, источниками и метаданными
-        
+
     Raises:
         RAGError: При критических ошибках системы
     """
     start = time.time()
     logger.info(f"Processing query: {message[:100]}...")
-    
+
     # Инициализация метрик
     error_type = None
     status = "success"
-    
+
     try:
         # 1. Query Processing
         try:
@@ -108,7 +108,7 @@ def handle_query(channel: str, chat_id: str, message: str) -> dict[str, Any]:
             search_duration = time.time() - search_start
             logger.info(f"Hybrid search in {search_duration:.2f}s")
             metrics_collector.record_search_duration("hybrid", search_duration)
-            
+
             if not candidates:
                 logger.warning("No candidates found in search")
                 error_type = "no_results"
@@ -174,12 +174,12 @@ def handle_query(channel: str, chat_id: str, message: str) -> dict[str, Any]:
 
         total_time = time.time() - start
         logger.info(f"Total processing time: {total_time:.2f}s")
-        
+
         # Записываем метрики успешного запроса
         metrics_collector.record_query(channel, status, error_type)
         metrics_collector.record_query_duration("total", total_time)
         metrics_collector.record_search_results("hybrid", len(candidates))
-        
+
         return {
             "answer": answer,
             "sources": sources,
@@ -190,13 +190,13 @@ def handle_query(channel: str, chat_id: str, message: str) -> dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Unexpected error in handle_query: {e}", exc_info=True)
-        
+
         # Записываем метрики ошибки
         error_type = type(e).__name__
         status = "error"
         metrics_collector.record_query(channel, status, error_type)
         metrics_collector.record_error(error_type, "orchestrator")
-        
+
         return {
             "error": "internal_error",
             "message": "Произошла внутренняя ошибка. Попробуйте позже или обратитесь в поддержку.",

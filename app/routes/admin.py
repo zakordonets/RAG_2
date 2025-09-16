@@ -28,15 +28,15 @@ def health():
     try:
         # Базовая проверка здоровья
         health_status = {"status": "ok"}
-        
+
         # Проверка Circuit Breakers
         circuit_breakers = get_all_circuit_breakers()
         health_status["circuit_breakers"] = circuit_breakers
-        
+
         # Проверка кэша
         cache_stats = get_cache_stats()
         health_status["cache"] = cache_stats
-        
+
         return jsonify(health_status)
     except Exception as e:
         logger.error(f"Health check failed: {e}")
@@ -60,7 +60,7 @@ def metrics_raw():
     try:
         from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
         from flask import Response
-        
+
         data = generate_latest()
         return Response(data, mimetype=CONTENT_TYPE_LATEST)
     except Exception as e:
@@ -110,5 +110,3 @@ def cache_status():
     except Exception as e:
         logger.error(f"Cache status failed: {e}")
         return jsonify({"error": "cache_status_failed", "message": str(e)}), 500
-
-
