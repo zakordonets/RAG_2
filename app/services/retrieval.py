@@ -55,7 +55,7 @@ def hybrid_search(query_dense: list[float], query_sparse: dict, k: int, boosts: 
     - boosts: словарь типа {page_type: factor}
     """
     from loguru import logger
-    
+
     boosts = boosts or {}
     params = SearchParams(hnsw_ef=EF_SEARCH)
 
@@ -77,7 +77,7 @@ def hybrid_search(query_dense: list[float], query_sparse: dict, k: int, boosts: 
     sparse_res = []
     indices = list((query_sparse or {}).get("indices", []))
     values = list((query_sparse or {}).get("values", []))
-    
+
     if indices and values and CONFIG.use_sparse:
         try:
             # Создаем правильный SparseVector
@@ -116,10 +116,8 @@ def hybrid_search(query_dense: list[float], query_sparse: dict, k: int, boosts: 
     # Apply boosts and sort
     for it in fused:
         it["boosted_score"] = boost_score(it)
-    
+
     fused.sort(key=lambda x: x["boosted_score"], reverse=True)
-    
+
     logger.debug(f"Final results: {len(fused[:k])} items")
     return fused[:k]
-
-

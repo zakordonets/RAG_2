@@ -42,7 +42,7 @@ def embed_dense(text: str) -> list[float]:
         model = _get_st_model()
         vec = model.encode(text, normalize_embeddings=True)
         return vec.tolist()
-    
+
     # Кэшированная версия
     model = _get_st_model()
     vec = model.encode(text, normalize_embeddings=True)
@@ -65,7 +65,7 @@ def embed_sparse(text: str) -> dict:
     """
     if not CONFIG.use_sparse:
         return {"indices": [], "values": []}
-    
+
     if not CONFIG.cache_enabled:
         # Если кэширование отключено, выполняем напрямую
         try:
@@ -84,7 +84,7 @@ def embed_sparse(text: str) -> dict:
         except Exception as e:
             logger.warning(f"Sparse embedding service failed: {e}")
             return {"indices": [], "values": []}
-    
+
     # Ожидаемый формат для Qdrant SparseVector: {indices: [...], values: [...]}
     # Если сервис вернул словарь term->weight, конвертируем в списки
     if isinstance(data, dict) and ("indices" not in data or "values" not in data):
@@ -96,5 +96,3 @@ def embed_sparse(text: str) -> dict:
 
 def embed_sparse_batch(texts: Iterable[str]) -> list[dict[str, float]]:
     return [embed_sparse(t) for t in texts]
-
-

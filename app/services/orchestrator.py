@@ -33,21 +33,21 @@ class LLMError(RAGError):
 def handle_query(channel: str, chat_id: str, message: str) -> dict[str, Any]:
     """
     Обрабатывает пользовательский запрос с comprehensive error handling.
-    
+
     Args:
         channel: Канал связи (telegram, web, etc.)
         chat_id: ID чата
         message: Текст сообщения
-        
+
     Returns:
         Словарь с ответом, источниками и метаданными
-        
+
     Raises:
         RAGError: При критических ошибках системы
     """
     start = time.time()
     logger.info(f"Processing query: {message[:100]}...")
-    
+
     try:
         # 1. Query Processing
         try:
@@ -91,7 +91,7 @@ def handle_query(channel: str, chat_id: str, message: str) -> dict[str, Any]:
         try:
             candidates = hybrid_search(q_dense, q_sparse, k=20, boosts=boosts)
             logger.info(f"Hybrid search in {time.time() - start:.2f}s")
-            
+
             if not candidates:
                 logger.warning("No candidates found in search")
                 return {
@@ -148,7 +148,7 @@ def handle_query(channel: str, chat_id: str, message: str) -> dict[str, Any]:
 
         total_time = time.time() - start
         logger.info(f"Total processing time: {total_time:.2f}s")
-        
+
         return {
             "answer": answer,
             "sources": sources,
@@ -166,5 +166,3 @@ def handle_query(channel: str, chat_id: str, message: str) -> dict[str, Any]:
             "channel": channel,
             "chat_id": chat_id
         }
-
-

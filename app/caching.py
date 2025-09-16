@@ -30,11 +30,11 @@ class CacheConfig:
 
 class InMemoryCache:
     """Простой in-memory кэш как fallback."""
-    
+
     def __init__(self, max_items: int = 1000):
         self.cache: dict[str, tuple[Any, float]] = {}
         self.max_items = max_items
-    
+
     def get(self, key: str) -> Optional[Any]:
         if key in self.cache:
             value, expiry = self.cache[key]
@@ -43,7 +43,7 @@ class InMemoryCache:
             else:
                 del self.cache[key]
         return None
-    
+
     def set(self, key: str, value: Any, ttl: int) -> None:
         # Удаляем старые элементы если кэш переполнен
         if len(self.cache) >= self.max_items:
@@ -52,24 +52,24 @@ class InMemoryCache:
             sorted_items = sorted(self.cache.items(), key=lambda x: x[1][1])
             for old_key, _ in sorted_items[:items_to_remove]:
                 del self.cache[old_key]
-        
+
         expiry = time.time() + ttl
         self.cache[key] = (value, expiry)
-    
+
     def delete(self, key: str) -> None:
         self.cache.pop(key, None)
-    
+
     def clear(self) -> None:
         self.cache.clear()
 
 
 class CacheManager:
     """Менеджер кэширования с поддержкой Redis и in-memory fallback."""
-    
+
     def __init__(self):
         self.redis_client = None
         self.memory_cache = InMemoryCache(CacheConfig.MAX_MEMORY_ITEMS)
-        
+
         if REDIS_AVAILABLE and CONFIG.redis_url:
             try:
                 self.redis_client = redis.from_url(CONFIG.redis_url)
@@ -81,7 +81,7 @@ class CacheManager:
                 self.redis_client = None
         else:
             logger.info("Using in-memory cache")
-    
+
     def get(self, key: str) -> Optional[Any]:
         """Получить значение из кэша."""
         try:
@@ -94,7 +94,7 @@ class CacheManager:
         except Exception as e:
             logger.warning(f"Cache get error: {e}")
             return None
-    
+
     def set(self, key: str, value: Any, ttl: int) -> None:
         """Установить значение в кэш."""
         try:
@@ -104,7 +104,7 @@ class CacheManager:
                 self.memory_cache.set(key, value, ttl)
         except Exception as e:
             logger.warning(f"Cache set error: {e}")
-    
+
     def delete(self, key: str) -> None:
         """Удалить значение из кэша."""
         try:
@@ -114,7 +114,7 @@ class CacheManager:
                 self.memory_cache.delete(key)
         except Exception as e:
             logger.warning(f"Cache delete error: {e}")
-    
+
     def clear(self) -> None:
         """Очистить весь кэш."""
         try:
@@ -140,7 +140,7 @@ def cache_key(prefix: str, *args) -> str:
 def cached(prefix: str, ttl: int = 3600):
     """
     Декоратор для кэширования результатов функций.
-    
+
     Args:
         prefix: Префикс для ключей кэша
         ttl: Время жизни в секундах
@@ -150,18 +150,18 @@ def cached(prefix: str, ttl: int = 3600):
         def wrapper(*args, **kwargs):
             # Создаем ключ кэша из аргументов функции
             key = cache_key(prefix, func.__name__, args, tuple(sorted(kwargs.items())))
-            
+
             # Пытаемся получить из кэша
             cached_result = cache_manager.get(key)
             if cached_result is not None:
                 logger.debug(f"Cache hit for {func.__name__}")
                 return cached_result
-            
+
             # Выполняем функцию и кэшируем результат
             logger.debug(f"Cache miss for {func.__name__}")
             result = func(*args, **kwargs)
             cache_manager.set(key, result, ttl)
-            
+
             return result
         return wrapper
     return decorator

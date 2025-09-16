@@ -16,7 +16,7 @@ class SecurityConfig:
     ALLOWED_CHANNELS = ["telegram", "web", "api"]
     RATE_LIMIT_REQUESTS = 10
     RATE_LIMIT_WINDOW = 300  # 5 минут
-    
+
     # Список запрещенных паттернов
     BLOCKED_PATTERNS = [
         r'<script.*?>.*?</script>',
@@ -70,57 +70,57 @@ class AdminReindexSchema(Schema):
 def sanitize_input(text: str) -> str:
     """
     Санитизация пользовательского ввода.
-    
+
     Args:
         text: Исходный текст
-        
+
     Returns:
         Очищенный текст
     """
     if not text:
         return ""
-    
+
     # HTML экранирование
     text = html.escape(text)
-    
+
     # Удаление потенциально опасных паттернов
     for pattern in SecurityConfig.BLOCKED_PATTERNS:
         text = re.sub(pattern, '', text, flags=re.IGNORECASE | re.DOTALL)
-    
+
     # Ограничение длины
     if len(text) > SecurityConfig.MAX_MESSAGE_LENGTH:
         text = text[:SecurityConfig.MAX_MESSAGE_LENGTH]
         logger.warning(f"Message truncated to {SecurityConfig.MAX_MESSAGE_LENGTH} characters")
-    
+
     # Удаление лишних пробелов
     text = re.sub(r'\s+', ' ', text).strip()
-    
+
     return text
 
 
 def validate_query_data(data: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
     """
     Валидация данных запроса.
-    
+
     Args:
         data: Словарь с данными запроса
-        
+
     Returns:
         Tuple (validated_data, errors)
     """
     try:
         # Валидация схемы
         validated = QuerySchema().load(data)
-        
+
         # Дополнительная санитизация
         validated["message"] = sanitize_input(validated["message"])
-        
+
         # Проверка на пустое сообщение после санитизации
         if not validated["message"]:
             return {}, ["Message cannot be empty after sanitization"]
-        
+
         return validated, []
-        
+
     except ValidationError as e:
         logger.warning(f"Validation error: {e.messages}")
         return {}, list(e.messages.values())[0] if e.messages else ["Validation failed"]
@@ -129,10 +129,10 @@ def validate_query_data(data: dict[str, Any]) -> tuple[dict[str, Any], list[str]
 def validate_admin_data(data: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
     """
     Валидация данных админских операций.
-    
+
     Args:
         data: Словарь с данными админской операции
-        
+
     Returns:
         Tuple (validated_data, errors)
     """
@@ -147,48 +147,48 @@ def validate_admin_data(data: dict[str, Any]) -> tuple[dict[str, Any], list[str]
 def is_safe_text(text: str) -> bool:
     """
     Проверка безопасности текста.
-    
+
     Args:
         text: Текст для проверки
-        
+
     Returns:
         True если текст безопасен
     """
     if not text:
         return True
-    
+
     # Проверка на опасные паттерны
     for pattern in SecurityConfig.BLOCKED_PATTERNS:
         if re.search(pattern, text, re.IGNORECASE | re.DOTALL):
             logger.warning(f"Unsafe pattern detected: {pattern}")
             return False
-    
+
     return True
 
 
 def validate_telegram_message(message: str) -> tuple[str, bool]:
     """
     Валидация сообщения от Telegram.
-    
+
     Args:
         message: Сообщение от пользователя
-        
+
     Returns:
         Tuple (sanitized_message, is_valid)
     """
     if not message:
         return "", False
-    
+
     # Базовая проверка длины
     if len(message) > SecurityConfig.MAX_MESSAGE_LENGTH:
         logger.warning(f"Message too long: {len(message)} characters")
         return "", False
-    
+
     # Санитизация
     sanitized = sanitize_input(message)
-    
+
     # Проверка на пустоту после санитизации
     if not sanitized:
         return "", False
-    
+
     return sanitized, True
