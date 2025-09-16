@@ -597,7 +597,7 @@ data:
       tag kubernetes.*
       format json
     </source>
-    
+
     <match kubernetes.**>
       @type elasticsearch
       host elasticsearch.logging.svc.cluster.local

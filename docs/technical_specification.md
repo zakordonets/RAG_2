@@ -77,7 +77,7 @@ POST /v1/admin/reindex
 
 #### Query Rewriting
 - **Цель**: Переформулирование запроса для лучшего поиска
-- **Примеры**: 
+- **Примеры**:
   - "Как настроить?" → "настройка конфигурация параметры"
   - "Проблема с API" → "API ошибка проблема решение"
 
@@ -136,14 +136,14 @@ def hybrid_search(dense_vec, sparse_vec, k=20):
         query_vector=dense_vec,
         limit=k
     )
-    
+
     # Sparse search
     sparse_results = client.search(
         collection_name="edna_docs",
         query_sparse=sparse_vec,
         limit=k
     )
-    
+
     # RRF fusion
     return rrf_fusion(dense_results, sparse_results)
 ```
@@ -251,7 +251,7 @@ def chunk_text(text: str) -> list[str]:
     chunks = []
     sentences = split_into_sentences(text)
     current_chunk = []
-    
+
     for sentence in sentences:
         if len(current_chunk) + len(sentence) > MAX_TOKENS:
             if current_chunk:
@@ -259,7 +259,7 @@ def chunk_text(text: str) -> list[str]:
                 current_chunk = [sentence]
         else:
             current_chunk.append(sentence)
-    
+
     return chunks
 ```
 

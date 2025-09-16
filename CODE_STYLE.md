@@ -22,7 +22,7 @@ def calculate_user_score(user_id: int, actions: list[dict]) -> float:
     """Вычисляет рейтинг пользователя на основе действий."""
     if not actions:
         return 0.0
-    
+
     total_score = sum(action.get('score', 0) for action in actions)
     return total_score / len(actions)
 
@@ -61,10 +61,10 @@ class ChatCenterAPI:
 class EmbeddingService:
     def __init__(self):
         self._model = None  # Один подчеркивание для protected
-    
+
     def _load_model(self):  # Один подчеркивание для private
         pass
-    
+
     def __validate_input(self):  # Два подчеркивания для name mangling
         pass
 ```
@@ -99,27 +99,27 @@ def process_query(
 
 ```python
 def hybrid_search(
-    dense_vector: List[float], 
-    sparse_vector: Dict[str, List], 
+    dense_vector: List[float],
+    sparse_vector: Dict[str, List],
     k: int = 20,
     boosts: Optional[Dict[str, float]] = None
 ) -> List[Dict[str, Any]]:
     """
     Выполняет гибридный поиск по dense и sparse векторам.
-    
+
     Args:
         dense_vector: Dense вектор запроса (1024 dim)
         sparse_vector: Sparse вектор запроса {indices: [...], values: [...]}
         k: Количество кандидатов для поиска
         boosts: Дополнительные бусты для метаданных
-        
+
     Returns:
         Список документов с релевантностью, отсортированный по убыванию score
-        
+
     Raises:
         QdrantError: При ошибках подключения к Qdrant
         ValidationError: При неверном формате векторов
-        
+
     Example:
         >>> dense_vec = [0.1, 0.2, ...]
         >>> sparse_vec = {"indices": [1, 2], "values": [0.5, 0.3]}
@@ -182,14 +182,14 @@ from loguru import logger
 
 def process_query(query: str) -> Dict[str, Any]:
     logger.info("Processing query", query_length=len(query))
-    
+
     try:
         result = do_processing(query)
-        logger.info("Query processed successfully", 
+        logger.info("Query processed successfully",
                    processing_time=result.time_taken)
         return result
     except Exception as e:
-        logger.error("Query processing failed", 
+        logger.error("Query processing failed",
                     error=str(e), query=query[:100])
         raise
 ```
@@ -246,36 +246,36 @@ def embed_sparse(text: str) -> Dict[str, List]:
 ```python
 class ChatCenterAPI:
     """Клиент для работы с Chat Center API."""
-    
+
     def __init__(self, base_url: str = "http://localhost:9000"):
         """
         Инициализирует API клиент.
-        
+
         Args:
             base_url: Базовый URL API сервера
         """
         self.base_url = base_url
         self.session = requests.Session()
         self._setup_session()
-    
+
     def _setup_session(self) -> None:
         """Настраивает HTTP сессию."""
         self.session.headers.update({
             'User-Agent': 'ChatCenter-API-Client/1.0',
             'Content-Type': 'application/json'
         })
-    
+
     def ask(self, message: str, chat_id: str = "default") -> Dict[str, Any]:
         """
         Задает вопрос системе.
-        
+
         Args:
             message: Текст вопроса
             chat_id: Идентификатор чата
-            
+
         Returns:
             Ответ системы с источниками
-            
+
         Raises:
             APIError: При ошибке API
         """
@@ -293,31 +293,31 @@ from typing import List
 @dataclass
 class AppConfig:
     """Конфигурация приложения."""
-    
+
     # API настройки
     qdrant_url: str = "http://localhost:6333"
     qdrant_api_key: str = ""
-    
+
     # LLM настройки
     yandex_api_key: str = ""
     yandex_catalog_id: str = ""
     default_llm: str = "yandex"
-    
+
     # Telegram настройки
     telegram_bot_token: str = ""
     telegram_poll_interval: float = 1.0
-    
+
     # Поиск
     hybrid_dense_weight: float = 0.7
     hybrid_sparse_weight: float = 0.3
     rerank_top_n: int = 10
-    
+
     # Краулинг
     crawl_deny_prefixes: List[str] = field(default_factory=lambda: [
         "https://docs-chatcenter.edna.ru/blog/",
         "https://docs-chatcenter.edna.ru/search/"
     ])
-    
+
     @classmethod
     def from_env(cls) -> 'AppConfig':
         """Создает конфигурацию из переменных окружения."""
@@ -336,27 +336,27 @@ from app.services.embeddings import embed_dense, embed_sparse
 
 class TestEmbeddings:
     """Тесты для модуля эмбеддингов."""
-    
+
     @patch('app.services.embeddings._get_dense_model')
     def test_embed_dense_success(self, mock_model):
         """Тест успешного создания dense эмбеддинга."""
         # Arrange
         mock_model.return_value.encode.return_value = [0.1, 0.2, 0.3]
         text = "test text"
-        
+
         # Act
         result = embed_dense(text)
-        
+
         # Assert
         assert result == [0.1, 0.2, 0.3]
         mock_model.return_value.encode.assert_called_once_with(text)
-    
+
     @patch('requests.post')
     def test_embed_sparse_error(self, mock_post):
         """Тест обработки ошибки sparse эмбеддинга."""
         # Arrange
         mock_post.side_effect = requests.RequestException("Network error")
-        
+
         # Act & Assert
         with pytest.raises(EmbeddingError):
             embed_sparse("test text")
@@ -482,12 +482,12 @@ repos:
     hooks:
       - id: black
         language_version: python3.11
-  
+
   - repo: https://github.com/pycqa/flake8
     rev: 6.0.0
     hooks:
       - id: flake8
-  
+
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.3.0
     hooks:

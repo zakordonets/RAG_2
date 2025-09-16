@@ -274,10 +274,10 @@ python adapters/telegram_polling.py
 1. **Prometheus метрики**:
    ```python
    from prometheus_client import Counter, Histogram, start_http_server
-   
+
    request_count = Counter('requests_total', 'Total requests')
    request_duration = Histogram('request_duration_seconds', 'Request duration')
-   
+
    @request_duration.time()
    def handle_query(query):
        request_count.inc()
@@ -287,7 +287,7 @@ python adapters/telegram_polling.py
 2. **Логирование**:
    ```python
    from loguru import logger
-   
+
    logger.add("logs/app.log", rotation="1 day", retention="30 days")
    logger.add("logs/error.log", level="ERROR", rotation="1 week")
    ```
@@ -310,13 +310,13 @@ python adapters/telegram_polling.py
 1. **Rate limiting**:
    ```python
    from flask_limiter import Limiter
-   
+
    limiter = Limiter(
        app,
        key_func=lambda: request.remote_addr,
        default_limits=["100 per hour"]
    )
-   
+
    @app.route('/v1/chat/query')
    @limiter.limit("10 per minute")
    def chat_query():
@@ -327,7 +327,7 @@ python adapters/telegram_polling.py
    ```python
    from functools import wraps
    import jwt
-   
+
    def require_auth(f):
        @wraps(f)
        def decorated(*args, **kwargs):
@@ -346,7 +346,7 @@ python adapters/telegram_polling.py
 3. **Валидация входных данных**:
    ```python
    from marshmallow import Schema, fields, validate
-   
+
    class ChatRequestSchema(Schema):
        message = fields.Str(required=True, validate=validate.Length(max=1000))
        chat_id = fields.Str(required=True, validate=validate.Length(max=100))
@@ -368,7 +368,7 @@ python adapters/telegram_polling.py
        secrets:
          - yandex_api_key
          - telegram_bot_token
-   
+
    secrets:
      yandex_api_key:
        external: true
@@ -395,14 +395,14 @@ python adapters/telegram_polling.py
    ```python
    from functools import lru_cache
    import redis
-   
+
    redis_client = redis.Redis(host='localhost', port=6379, db=0)
-   
+
    @lru_cache(maxsize=1000)
    def get_embedding(text):
        # Кэширование эмбеддингов
        pass
-   
+
    def cache_query_result(query, result):
        redis_client.setex(f"query:{hash(query)}", 3600, json.dumps(result))
    ```
@@ -411,7 +411,7 @@ python adapters/telegram_polling.py
    ```python
    import asyncio
    import aiohttp
-   
+
    async def process_queries_async(queries):
        async with aiohttp.ClientSession() as session:
            tasks = [process_single_query(session, q) for q in queries]
@@ -432,7 +432,7 @@ python adapters/telegram_polling.py
    class LazyModel:
        def __init__(self):
            self._model = None
-       
+
        @property
        def model(self):
            if self._model is None:
@@ -443,7 +443,7 @@ python adapters/telegram_polling.py
 2. **Очистка памяти**:
    ```python
    import gc
-   
+
    def process_large_batch(data):
        results = []
        for chunk in chunks(data, 100):

@@ -165,11 +165,11 @@ def process_query(query: str) -> dict:
     logger.info("Processing query", query_length=len(query))
     try:
         result = do_processing(query)
-        logger.info("Query processed successfully", 
+        logger.info("Query processed successfully",
                    processing_time=result.time_taken)
         return result
     except Exception as e:
-        logger.error("Query processing failed", 
+        logger.error("Query processing failed",
                     error=str(e), query=query[:100])
         raise
 ```
@@ -194,26 +194,26 @@ class WebAdapter:
         self.api_base = api_base
         self.app = FastAPI()
         self.setup_routes()
-    
+
     def setup_routes(self):
         @self.app.websocket("/ws")
         async def websocket_endpoint(websocket: WebSocket):
             await websocket.accept()
             logger.info("WebSocket connection established")
-            
+
             try:
                 while True:
                     data = await websocket.receive_text()
                     message_data = json.loads(data)
-                    
+
                     # Обработка сообщения
                     response = await self.process_message(message_data)
                     await websocket.send_text(json.dumps(response))
-                    
+
             except Exception as e:
                 logger.error(f"WebSocket error: {e}")
                 await websocket.close()
-    
+
     async def process_message(self, message_data: dict) -> dict[str, Any]:
         # Интеграция с Core API
         import httpx
@@ -242,7 +242,7 @@ if __name__ == "__main__":
 @dataclass
 class AppConfig:
     # ... существующие поля ...
-    
+
     # Web adapter
     web_adapter_host: str = "0.0.0.0"
     web_adapter_port: int = 8001
@@ -276,22 +276,22 @@ def _claude_complete(prompt: str, max_tokens: int = 800) -> str:
     """Claude API integration."""
     if not CONFIG.claude_api_key:
         raise RuntimeError("Claude API key is not set")
-    
+
     headers = {
         "x-api-key": CONFIG.claude_api_key,
         "Content-Type": "application/json"
     }
-    
+
     payload = {
         "model": CONFIG.claude_model or "claude-3-sonnet-20240229",
         "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}]
     }
-    
+
     resp = requests.post(CONFIG.claude_api_url, headers=headers, json=payload, timeout=60)
     resp.raise_for_status()
     data = resp.json()
-    
+
     try:
         return data["content"][0]["text"]
     except Exception:
@@ -299,7 +299,7 @@ def _claude_complete(prompt: str, max_tokens: int = 800) -> str:
 
 def generate_answer(query: str, context: list[dict], policy: dict[str, Any] | None = None) -> str:
     # ... существующий код ...
-    
+
     order = [DEFAULT_LLM, "GPT5", "DEEPSEEK", "CLAUDE"]  # Добавили Claude
     for provider in order:
         try:
@@ -320,7 +320,7 @@ def generate_answer(query: str, context: list[dict], policy: dict[str, Any] | No
 @dataclass
 class AppConfig:
     # ... существующие поля ...
-    
+
     # Claude
     claude_api_url: str = "https://api.anthropic.com/v1/messages"
     claude_api_key: str = ""
@@ -346,16 +346,16 @@ CLAUDE_MODEL=claude-3-sonnet-20240229
 def parse_api_specification(content: str) -> dict:
     """Парсер для OpenAPI/Swagger спецификаций."""
     soup = BeautifulSoup(content, "lxml")
-    
+
     # Поиск OpenAPI спецификации
     script_tag = soup.find("script", {"type": "application/json"})
     if not script_tag:
         return {"endpoints": [], "schemas": []}
-    
+
     try:
         spec = json.loads(script_tag.string)
         endpoints = []
-        
+
         for path, methods in spec.get("paths", {}).items():
             for method, details in methods.items():
                 endpoints.append({
@@ -366,7 +366,7 @@ def parse_api_specification(content: str) -> dict:
                     "parameters": details.get("parameters", []),
                     "responses": details.get("responses", {})
                 })
-        
+
         return {
             "endpoints": endpoints,
             "schemas": spec.get("components", {}).get("schemas", {}),
@@ -395,19 +395,19 @@ def classify_page(url: str) -> str:
 
 def crawl_and_index(incremental: bool = True) -> dict[str, Any]:
     # ... существующий код ...
-    
+
     for p in all_pages:
         url = p["url"]
         html = p["html"]
         page_type = classify_page(url)
-        
+
         # Специализированный парсинг
         if page_type == "api_spec":
             parsed = parse_api_specification(html)
             # Обработка спецификации...
         else:
             parsed = parse_guides(html)
-        
+
         # ... остальной код ...
 ```
 
@@ -428,21 +428,21 @@ class TestEmbeddings:
     @patch('app.services.embeddings._get_dense_model')
     def test_embed_dense(self, mock_model):
         mock_model.return_value.encode.return_value = [0.1, 0.2, 0.3]
-        
+
         result = embed_dense("test text")
-        
+
         assert result == [0.1, 0.2, 0.3]
         mock_model.return_value.encode.assert_called_once_with("test text")
-    
+
     @patch('requests.post')
     def test_embed_sparse(self, mock_post):
         mock_post.return_value.json.return_value = {
             "sparse_vecs": {"1": 0.5, "2": 0.3}
         }
         mock_post.return_value.raise_for_status.return_value = None
-        
+
         result = embed_sparse("test text")
-        
+
         assert result == {"indices": ["1", "2"], "values": [0.5, 0.3]}
 
 class TestRetrieval:
@@ -451,9 +451,9 @@ class TestRetrieval:
         mock_client.search.return_value = [
             {"id": "1", "score": 0.9, "payload": {"text": "test"}}
         ]
-        
+
         result = hybrid_search([0.1, 0.2], {"indices": [], "values": []})
-        
+
         assert len(result) == 1
         assert result[0]["id"] == "1"
 
@@ -461,10 +461,10 @@ class TestLLMRouter:
     @patch('app.services.llm_router._yandex_complete')
     def test_generate_answer(self, mock_yandex):
         mock_yandex.return_value = "Test answer"
-        
+
         context = [{"payload": {"url": "http://test.com", "title": "Test"}}]
         result = generate_answer("test query", context)
-        
+
         assert "Test answer" in result
         mock_yandex.assert_called_once()
 ```
@@ -494,7 +494,7 @@ def test_chat_endpoint(client):
         'chat_id': '123',
         'message': 'test message'
     })
-    
+
     assert response.status_code == 200
     data = response.get_json()
     assert 'answer' in data
@@ -502,7 +502,7 @@ def test_chat_endpoint(client):
 
 def test_health_endpoint(client):
     response = client.get('/v1/admin/health')
-    
+
     assert response.status_code == 200
     data = response.get_json()
     assert data['status'] == 'ok'
@@ -521,10 +521,10 @@ from app.services.orchestrator import handle_query
 def test_full_pipeline():
     """Тест полного пайплайна обработки запроса."""
     query = "Как настроить маршрутизацию?"
-    
+
     # Тест оркестратора
     result = handle_query("test", "123", query)
-    
+
     assert "answer" in result
     assert "sources" in result
     assert len(result["sources"]) > 0
@@ -560,12 +560,12 @@ from app.services.orchestrator import handle_query
 def profile_query_processing():
     profiler = cProfile.Profile()
     profiler.enable()
-    
+
     # Ваш код
     result = handle_query("test", "123", "test query")
-    
+
     profiler.disable()
-    
+
     # Анализ результатов
     stats = pstats.Stats(profiler)
     stats.sort_stats('cumulative')
@@ -583,19 +583,19 @@ from app.services.orchestrator import handle_query
 
 def monitor_memory():
     tracemalloc.start()
-    
+
     # Ваш код
     result = handle_query("test", "123", "test query")
-    
+
     # Анализ памяти
     current, peak = tracemalloc.get_traced_memory()
     print(f"Current memory usage: {current / 1024 / 1024:.2f} MB")
     print(f"Peak memory usage: {peak / 1024 / 1024:.2f} MB")
-    
+
     # Топ-10 строк по памяти
     snapshot = tracemalloc.take_snapshot()
     top_stats = snapshot.statistics('lineno')
-    
+
     for stat in top_stats[:10]:
         print(stat)
 
@@ -617,7 +617,7 @@ async def async_embed_batch(texts: List[str]) -> List[List[float]]:
         for text in texts:
             task = async_embed_single(session, text)
             tasks.append(task)
-        
+
         results = await asyncio.gather(*tasks)
         return results
 
@@ -633,27 +633,27 @@ async def async_embed_single(session: aiohttp.ClientSession, text: str) -> List[
 
 ```python
 def hybrid_search(
-    dense_vector: list[float], 
-    sparse_vector: dict, 
+    dense_vector: list[float],
+    sparse_vector: dict,
     k: int = 20,
     boosts: dict | None = None
 ) -> list[dict]:
     """
     Выполняет гибридный поиск по dense и sparse векторам.
-    
+
     Args:
         dense_vector: Dense вектор запроса (1024 dim)
         sparse_vector: Sparse вектор запроса {indices: [...], values: [...]}
         k: Количество кандидатов для поиска
         boosts: Дополнительные бусты для метаданных
-        
+
     Returns:
         Список документов с релевантностью, отсортированный по убыванию score
-        
+
     Raises:
         QdrantError: При ошибках подключения к Qdrant
         ValidationError: При неверном формате векторов
-        
+
     Example:
         >>> dense_vec = [0.1, 0.2, ...]
         >>> sparse_vec = {"indices": [1, 2], "values": [0.5, 0.3]}
@@ -685,12 +685,12 @@ def process_query(
 ) -> Union[Dict[str, Any], None]:
     """
     Обрабатывает пользовательский запрос.
-    
+
     Args:
         query: Текст запроса пользователя
         context: Контекстные документы
         options: Дополнительные опции обработки
-        
+
     Returns:
         Результат обработки или None при ошибке
     """
@@ -715,21 +715,21 @@ def process_query(
 ```python
 # Хорошо: читаемый и понятный код
 def calculate_relevance_score(
-    query_embedding: List[float], 
+    query_embedding: List[float],
     doc_embedding: List[float]
 ) -> float:
     """Вычисляет релевантность документа к запросу."""
     if len(query_embedding) != len(doc_embedding):
         raise ValueError("Embedding dimensions must match")
-    
+
     # Косинусное сходство
     dot_product = sum(q * d for q, d in zip(query_embedding, doc_embedding))
     query_norm = sum(q * q for q in query_embedding) ** 0.5
     doc_norm = sum(d * d for d in doc_embedding) ** 0.5
-    
+
     if query_norm == 0 or doc_norm == 0:
         return 0.0
-    
+
     return dot_product / (query_norm * doc_norm)
 
 # Плохо: нечитаемый код
@@ -755,38 +755,38 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pytest black flake8 mypy
-    
+
     - name: Lint with flake8
       run: |
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    
+
     - name: Type check with mypy
       run: |
         mypy app/ --ignore-missing-imports
-    
+
     - name: Format check with black
       run: |
         black --check .
-    
+
     - name: Test with pytest
       run: |
         pytest tests/ --cov=app --cov-report=xml
-    
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
@@ -804,19 +804,19 @@ repos:
       - id: black
         language_version: python3.11
         args: [--line-length=88]
-  
+
   - repo: https://github.com/pycqa/flake8
     rev: 6.0.0
     hooks:
       - id: flake8
         args: [--max-line-length=88, --extend-ignore=E203]
-  
+
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.3.0
     hooks:
       - id: mypy
         additional_dependencies: [types-requests, types-PyYAML]
-  
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
     hooks:
@@ -841,7 +841,7 @@ logger.add("logs/error.log", level="ERROR", rotation="1 week")
 # Использование в коде
 def process_query(query: str) -> dict:
     logger.debug(f"Processing query: {query[:100]}...")
-    
+
     try:
         result = do_processing(query)
         logger.info(f"Query processed successfully in {result.time_taken:.2f}s")
@@ -874,16 +874,16 @@ def profile_function(func, *args, **kwargs):
     """Профилирует выполнение функции."""
     profiler = cProfile.Profile()
     profiler.enable()
-    
+
     result = func(*args, **kwargs)
-    
+
     profiler.disable()
-    
+
     # Анализ результатов
     s = io.StringIO()
     ps = pstats.Stats(profiler, stream=s).sort_stats('cumulative')
     ps.print_stats()
-    
+
     print(s.getvalue())
     return result
 ```
