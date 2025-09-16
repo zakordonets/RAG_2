@@ -23,7 +23,7 @@ class SemanticChunker:
     """
     Семантический chunker, который разбивает текст на основе семантического сходства.
     """
-    
+
     def __init__(
         self,
         model_name: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
@@ -34,7 +34,7 @@ class SemanticChunker:
     ):
         """
         Инициализация семантического chunker.
-        
+
         Args:
             model_name: Название модели для вычисления эмбеддингов
             similarity_threshold: Порог сходства для объединения предложений
@@ -47,7 +47,7 @@ class SemanticChunker:
         self.min_chunk_size = min_chunk_size
         self.max_chunk_size = max_chunk_size
         self.overlap_size = overlap_size
-        
+
         self.model = None
         if SENTENCE_TRANSFORMERS_AVAILABLE:
             try:
@@ -58,19 +58,19 @@ class SemanticChunker:
                 self.model = None
         else:
             logger.warning("SentenceTransformers not available, using fallback chunker")
-    
+
     def _split_into_sentences(self, text: str) -> List[str]:
         """Разбивает текст на предложения."""
         # Простое разбиение по знакам препинания
         sentences = re.split(r'[.!?]+', text)
         sentences = [s.strip() for s in sentences if s.strip()]
         return sentences
-    
+
     def _split_into_paragraphs(self, text: str) -> List[str]:
         """Разбивает текст на абзацы."""
         paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
         return paragraphs
-    
+
     def _compute_similarity(self, sentence1: str, sentence2: str) -> float:
         """Вычисляет семантическое сходство между предложениями."""
         if not self.model:
@@ -82,7 +82,7 @@ class SemanticChunker:
             intersection = len(words1.intersection(words2))
             union = len(words1.union(words2))
             return intersection / union if union > 0 else 0.0
-        
+
         try:
             embeddings = self.model.encode([sentence1, sentence2])
             # Косинусное сходство
@@ -93,25 +93,25 @@ class SemanticChunker:
         except Exception as e:
             logger.warning(f"Error computing similarity: {e}")
             return 0.0
-    
+
     def _estimate_tokens(self, text: str) -> int:
         """Оценивает количество токенов в тексте."""
         # Простая оценка: ~1 токен = 1 слово
         return len(text.split())
-    
+
     def _create_chunks_from_sentences(self, sentences: List[str]) -> List[str]:
         """Создает чанки из предложений на основе семантического сходства."""
         if not sentences:
             return []
-        
+
         chunks = []
         current_chunk = [sentences[0]]
         current_tokens = self._estimate_tokens(sentences[0])
-        
+
         for i in range(1, len(sentences)):
             sentence = sentences[i]
             sentence_tokens = self._estimate_tokens(sentence)
-            
+
             # Проверяем, поместится ли предложение в текущий чанк
             if current_tokens + sentence_tokens > self.max_chunk_size:
                 # Чанк заполнен, сохраняем его
@@ -120,10 +120,10 @@ class SemanticChunker:
                 current_chunk = [sentence]
                 current_tokens = sentence_tokens
                 continue
-            
+
             # Вычисляем сходство с предыдущим предложением
             similarity = self._compute_similarity(sentences[i-1], sentence)
-            
+
             if similarity > self.similarity_threshold:
                 # Предложения семантически похожи, объединяем
                 current_chunk.append(sentence)
@@ -134,26 +134,26 @@ class SemanticChunker:
                     chunks.append(' '.join(current_chunk))
                 current_chunk = [sentence]
                 current_tokens = sentence_tokens
-        
+
         # Добавляем последний чанк
         if current_chunk and current_tokens >= self.min_chunk_size:
             chunks.append(' '.join(current_chunk))
-        
+
         return chunks
-    
+
     def _create_chunks_from_paragraphs(self, paragraphs: List[str]) -> List[str]:
         """Создает чанки из абзацев с учетом семантического сходства."""
         if not paragraphs:
             return []
-        
+
         chunks = []
         current_chunk = [paragraphs[0]]
         current_tokens = self._estimate_tokens(paragraphs[0])
-        
+
         for i in range(1, len(paragraphs)):
             paragraph = paragraphs[i]
             paragraph_tokens = self._estimate_tokens(paragraph)
-            
+
             # Проверяем размер
             if current_tokens + paragraph_tokens > self.max_chunk_size:
                 if current_tokens >= self.min_chunk_size:
@@ -161,10 +161,10 @@ class SemanticChunker:
                 current_chunk = [paragraph]
                 current_tokens = paragraph_tokens
                 continue
-            
+
             # Вычисляем сходство между абзацами
             similarity = self._compute_similarity(paragraphs[i-1], paragraph)
-            
+
             if similarity > self.similarity_threshold:
                 current_chunk.append(paragraph)
                 current_tokens += paragraph_tokens
@@ -173,29 +173,29 @@ class SemanticChunker:
                     chunks.append('\n\n'.join(current_chunk))
                 current_chunk = [paragraph]
                 current_tokens = paragraph_tokens
-        
+
         # Добавляем последний чанк
         if current_chunk and current_tokens >= self.min_chunk_size:
             chunks.append('\n\n'.join(current_chunk))
-        
+
         return chunks
-    
+
     def chunk_text(self, text: str) -> List[str]:
         """
         Разбивает текст на семантически связанные чанки.
-        
+
         Args:
             text: Исходный текст для разбиения
-            
+
         Returns:
             Список чанков
         """
         if not text or not text.strip():
             return []
-        
+
         # Сначала пробуем разбить по абзацам
         paragraphs = self._split_into_paragraphs(text)
-        
+
         # Если абзацы слишком большие, разбиваем по предложениям
         if any(self._estimate_tokens(p) > self.max_chunk_size for p in paragraphs):
             logger.debug("Using sentence-based chunking due to large paragraphs")
@@ -206,17 +206,17 @@ class SemanticChunker:
         else:
             logger.debug("Using paragraph-based chunking")
             chunks = self._create_chunks_from_paragraphs(paragraphs)
-        
+
         # Применяем quality gates
         chunks = self._apply_quality_gates(chunks)
-        
+
         return chunks
-    
+
     def _apply_quality_gates(self, chunks: List[str]) -> List[str]:
         """Применяет quality gates к чанкам."""
         # Удаляем пустые чанки
         chunks = [chunk for chunk in chunks if chunk.strip()]
-        
+
         # Дедупликация
         seen = set()
         unique_chunks = []
@@ -225,7 +225,7 @@ class SemanticChunker:
             if chunk_hash not in seen:
                 seen.add(chunk_hash)
                 unique_chunks.append(chunk)
-        
+
         # Проверяем минимальный размер
         filtered_chunks = []
         for chunk in unique_chunks:
@@ -234,42 +234,42 @@ class SemanticChunker:
                 filtered_chunks.append(chunk)
             else:
                 logger.debug(f"Chunk too small ({tokens} tokens), skipping")
-        
+
         return filtered_chunks
-    
+
     def chunk_with_overlap(self, text: str) -> List[str]:
         """
         Создает чанки с перекрытием для лучшего контекста.
-        
+
         Args:
             text: Исходный текст
-            
+
         Returns:
             Список чанков с перекрытием
         """
         chunks = self.chunk_text(text)
-        
+
         if len(chunks) <= 1:
             return chunks
-        
+
         overlapped_chunks = []
         for i, chunk in enumerate(chunks):
             overlapped_chunks.append(chunk)
-            
+
             # Добавляем перекрытие с предыдущим чанком
             if i > 0:
                 prev_chunk = chunks[i-1]
                 prev_words = prev_chunk.split()
                 overlap_words = prev_words[-self.overlap_size:] if len(prev_words) > self.overlap_size else prev_words
-                
+
                 if overlap_words:
                     overlap_text = ' '.join(overlap_words)
                     overlapped_chunk = f"{overlap_text} {chunk}"
-                    
+
                     # Проверяем, что перекрытый чанк не превышает максимальный размер
                     if self._estimate_tokens(overlapped_chunk) <= self.max_chunk_size:
                         overlapped_chunks[-1] = overlapped_chunk
-        
+
         return overlapped_chunks
 
 
@@ -291,16 +291,16 @@ def get_semantic_chunker() -> SemanticChunker:
 def chunk_text_semantic(text: str, use_overlap: bool = False) -> List[str]:
     """
     Разбивает текст на семантически связанные чанки.
-    
+
     Args:
         text: Исходный текст
         use_overlap: Использовать перекрытие между чанками
-        
+
     Returns:
         Список чанков
     """
     chunker = get_semantic_chunker()
-    
+
     if use_overlap:
         return chunker.chunk_with_overlap(text)
     else:

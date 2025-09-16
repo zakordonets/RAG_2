@@ -22,23 +22,23 @@ def text_hash(text: str) -> str:
 def chunk_text(text: str, min_tokens: int = None, max_tokens: int = None, use_semantic: bool = True) -> list[str]:
     """
     Разбивает текст на чанки с возможностью использования семантического chunker.
-    
+
     Args:
         text: Исходный текст
         min_tokens: Минимальный размер чанка в токенах
         max_tokens: Максимальный размер чанка в токенах
         use_semantic: Использовать семантический chunker
-        
+
     Returns:
         Список чанков
     """
     # Используем значения из конфигурации по умолчанию
     min_tokens = min_tokens or CONFIG.chunk_min_tokens
     max_tokens = max_tokens or CONFIG.chunk_max_tokens
-    
+
     if not text or not text.strip():
         return []
-    
+
     # Пробуем использовать семантический chunker
     if use_semantic and SEMANTIC_CHUNKER_AVAILABLE:
         try:
@@ -51,7 +51,7 @@ def chunk_text(text: str, min_tokens: int = None, max_tokens: int = None, use_se
                 logger.warning("Semantic chunker returned no chunks, falling back to simple chunker")
         except Exception as e:
             logger.warning(f"Semantic chunker failed: {e}, falling back to simple chunker")
-    
+
     # Fallback к простому chunker
     logger.debug("Using simple chunker")
     return _chunk_text_simple(text, min_tokens, max_tokens)
@@ -63,7 +63,7 @@ def _chunk_text_simple(text: str, min_tokens: int, max_tokens: int) -> list[str]
     chunks: list[str] = []
     cur: list[str] = []
     count = 0
-    
+
     for p in paragraphs:
         tokens = p.split()
         if count + len(tokens) <= max_tokens:
@@ -74,7 +74,7 @@ def _chunk_text_simple(text: str, min_tokens: int, max_tokens: int) -> list[str]
                 chunks.append("\n\n".join(cur))
             cur = [p]
             count = len(tokens)
-    
+
     if cur and count >= min_tokens:
         chunks.append("\n\n".join(cur))
 
@@ -87,7 +87,7 @@ def _chunk_text_simple(text: str, min_tokens: int, max_tokens: int) -> list[str]
             continue
         seen.add(h)
         uniq.append(c)
-    
+
     if uniq:
         return uniq
 
@@ -101,21 +101,21 @@ def _chunk_text_simple(text: str, min_tokens: int, max_tokens: int) -> list[str]
 def chunk_text_with_overlap(text: str, min_tokens: int = None, max_tokens: int = None) -> list[str]:
     """
     Разбивает текст на чанки с перекрытием.
-    
+
     Args:
         text: Исходный текст
         min_tokens: Минимальный размер чанка в токенах
         max_tokens: Максимальный размер чанка в токенах
-        
+
     Returns:
         Список чанков с перекрытием
     """
     min_tokens = min_tokens or CONFIG.chunk_min_tokens
     max_tokens = max_tokens or CONFIG.chunk_max_tokens
-    
+
     if not text or not text.strip():
         return []
-    
+
     # Используем семантический chunker с перекрытием
     if SEMANTIC_CHUNKER_AVAILABLE:
         try:
@@ -126,9 +126,7 @@ def chunk_text_with_overlap(text: str, min_tokens: int = None, max_tokens: int =
                 return chunks
         except Exception as e:
             logger.warning(f"Semantic chunker with overlap failed: {e}")
-    
+
     # Fallback к простому chunker без перекрытия
     logger.debug("Using simple chunker (no overlap support)")
     return _chunk_text_simple(text, min_tokens, max_tokens)
-
-

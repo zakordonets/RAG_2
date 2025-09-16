@@ -164,7 +164,7 @@ def security_user_status(user_id: str):
     try:
         risk_score = security_monitor.get_user_risk_score(user_id)
         is_blocked = security_monitor.is_user_blocked(user_id)
-        
+
         return jsonify({
             "user_id": user_id,
             "risk_score": risk_score,
@@ -182,7 +182,7 @@ def security_block_user(user_id: str):
     try:
         payload = request.get_json(silent=True) or {}
         reason = payload.get("reason", "Manual block")
-        
+
         security_monitor.block_user(user_id, reason)
         return jsonify({"status": "user_blocked", "user_id": user_id, "reason": reason})
     except Exception as e:

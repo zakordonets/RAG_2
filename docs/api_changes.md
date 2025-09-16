@@ -228,3 +228,47 @@ curl -X POST http://localhost:9000/v1/admin/circuit-breakers/reset
 ```bash
 curl http://localhost:8000/metrics
 ```
+
+### Управление Rate Limiting
+```bash
+# Проверка состояния Rate Limiter
+curl http://localhost:9000/v1/admin/rate-limiter
+
+# Проверка пользователя
+curl http://localhost:9000/v1/admin/rate-limiter/123456789
+
+# Сброс лимитов пользователя
+curl -X POST http://localhost:9000/v1/admin/rate-limiter/123456789/reset
+```
+
+### Управление безопасностью
+```bash
+# Статистика безопасности
+curl http://localhost:9000/v1/admin/security
+
+# Состояние пользователя
+curl http://localhost:9000/v1/admin/security/user/123456789
+
+# Блокировка пользователя
+curl -X POST http://localhost:9000/v1/admin/security/user/123456789/block \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "Suspicious activity"}'
+```
+
+## 🆕 Дополнительные API endpoints (завершены)
+
+### Rate Limiting
+- `GET /v1/admin/rate-limiter` - Состояние Rate Limiter
+- `GET /v1/admin/rate-limiter/<user_id>` - Состояние пользователя
+- `POST /v1/admin/rate-limiter/<user_id>/reset` - Сброс лимитов
+
+### Безопасность
+- `GET /v1/admin/security` - Статистика безопасности
+- `GET /v1/admin/security/user/<user_id>` - Состояние пользователя
+- `POST /v1/admin/security/user/<user_id>/block` - Блокировка пользователя
+
+### Новые возможности
+- **Семантическое chunking** - улучшенное разбиение текста
+- **Rate Limiting** - защита от злоупотреблений
+- **Улучшенный Telegram адаптер** - красивое форматирование
+- **Система безопасности** - мониторинг и блокировка
